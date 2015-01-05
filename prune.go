@@ -5,19 +5,24 @@ import (
 	"sync"
 )
 
-type TaskStream interface {
-	Read() Task
+type Stream interface {
+	Read() Input
 }
 
-type Task interface {
-	Process() int
+type Input interface {
+	Map() int
 }
 
-func Run(stream TaskStream) {
+type Reducer interface {
+	Reduce(chan int)
+	String() string
+}
+
+func Run(stream Stream, reducer Reducer) {
 	wg := sync.WaitGroup{}
 	wg.Add(1)
 
-	in := make(chan Task)
+	in := make(chan Input)
 
 	go func() {
 		for {
@@ -37,7 +42,7 @@ func Run(stream TaskStream) {
 		go func() {
 			wg.Add(1)
 			for task := range in {
-				out <- task.Process()
+				out <- task.Map()
 			}
 			wg.Done()
 		}()
@@ -48,10 +53,6 @@ func Run(stream TaskStream) {
 		close(out)
 	}()
 
-	var sum uint64
-
-	for n := range out {
-		sum += uint64(n)
-	}
-	fmt.Println("sum: ", sum)
+	reducer.Reduce(out)
+	fmt.Println(reducer.String())
 }
